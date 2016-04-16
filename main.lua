@@ -10,6 +10,7 @@ cmd = torch.CmdLine()
 cmd:text()
 cmd:option('-max_max_epoch', 13, 'max_max_epoch')
 cmd:option('-save', 'model/default_model_name.t7', 'model save path')
+cmd:option('-max_grad_norm', 5, 'max-grad norm')
 opt = cmd:parse(arg or {})
 
 gpu = false
@@ -39,7 +40,7 @@ local params = {
                 vocab_size=10000, -- limit on the vocabulary size
                 max_epoch=4,  -- when to start decaying learning rate
                 max_max_epoch=opt.max_max_epoch, -- final epoch
-                max_grad_norm=5 -- clip when gradients exceed this norm value
+                max_grad_norm=opt.max_grad_norm -- clip when gradients exceed this norm value
                }
 
 function transfer_data(x)
@@ -98,7 +99,9 @@ function create_network()
     local h2y                = nn.Linear(params.rnn_size, params.vocab_size)
     local dropped            = nn.Dropout(params.dropout)(i[params.layers])
     local pred               = nn.LogSoftMax()(h2y(dropped))
-    local err                = nn.ClassNLLCriterion()({pred, y})
+    local err_nll            = nn.ClassNLLCriterion()({pred, y})
+    -- directly use the perplexity error
+    local err                = nn.Exp()(err_nll)
     local module             = nn.gModule({x, y, prev_s},
                                       {err, nn.Identity()(next_s)})
     -- initialize weights
@@ -215,7 +218,7 @@ function run_valid()
     for i = 1, len do
         perp = perp + fp(state_valid)
     end
-    print("Validation set perplexity : " .. g_f3(torch.exp(perp / len)))
+    print("Validation set perplexity : " .. g_f3((perp / len)))
     g_enable_dropout(model.rnns)
 end
 
@@ -234,7 +237,7 @@ function run_test()
         perp = perp + perp_tmp[1]
         g_replace_table(model.s[0], model.s[1])
     end
-    print("Test set perplexity : " .. g_f3(torch.exp(perp / (len - 1))))
+    print("Test set perplexity : " .. g_f3((perp / (len - 1))))
     g_enable_dropout(model.rnns)
 end
 
@@ -286,7 +289,7 @@ while epoch < params.max_max_epoch do
         wps = torch.floor(total_cases / torch.toc(start_time))
         since_beginning = g_d(torch.toc(beginning_time) / 60)
         print('epoch = ' .. g_f3(epoch) ..
-             ', train perp. = ' .. g_f3(torch.exp(perps:mean())) ..
+             ', train perp. = ' .. g_f3((perps:mean())) ..
              ', wps = ' .. wps ..
              ', dw:norm() = ' .. g_f3(model.norm_dw) ..
              ', lr = ' ..  g_f3(params.lr) ..
