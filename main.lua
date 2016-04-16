@@ -299,8 +299,8 @@ while epoch < params.max_max_epoch do
         if epoch > params.max_epoch then
             params.lr = params.lr / params.decay
         end
+	torch.save(string.format('%s.%d',opt.save, step/epoch_size),model.core_network)
     end
 end
 run_test()
-torch.save(opt.save,model.core_network)
 print("Training is over.")
