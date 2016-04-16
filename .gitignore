@@ -1,1 +1,4 @@
 *.mat
+train.sh
+model/*
+pbs/*

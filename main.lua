@@ -6,6 +6,12 @@
 ----  LICENSE file in the root directory of this source tree. 
 ----
 
+cmd = torch.CmdLine()
+cmd:text()
+cmd:option('-max_max_epoch', 13, 'max_max_epoch')
+cmd:option('-save', 'model/default_model_name.t7', 'model save path')
+opt = cmd:parse(arg or {})
+
 gpu = false
 if gpu then
     require 'cunn'
@@ -32,7 +38,7 @@ local params = {
                 lr=1, --learning rate
                 vocab_size=10000, -- limit on the vocabulary size
                 max_epoch=4,  -- when to start decaying learning rate
-                max_max_epoch=13, -- final epoch
+                max_max_epoch=opt.max_max_epoch, -- final epoch
                 max_grad_norm=5 -- clip when gradients exceed this norm value
                }
 
@@ -276,7 +282,7 @@ while epoch < params.max_max_epoch do
     epoch = step / epoch_size
     
     -- display details at some interval
-    if step % torch.round(epoch_size / 10) == 10 then
+    if step % torch.round(epoch_size / 20) == 20 then
         wps = torch.floor(total_cases / torch.toc(start_time))
         since_beginning = g_d(torch.toc(beginning_time) / 60)
         print('epoch = ' .. g_f3(epoch) ..
@@ -296,4 +302,5 @@ while epoch < params.max_max_epoch do
     end
 end
 run_test()
+torch.save(opt.save,model.core_network)
 print("Training is over.")
