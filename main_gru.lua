@@ -102,7 +102,7 @@ local function gru(x, prev_h)
     
     return next_h
 end
-
+module_for_test = {}
 function create_network()
     local x                  = nn.Identity()()
     local y                  = nn.Identity()()
@@ -127,6 +127,35 @@ function create_network()
     local err                = nn.ClassNLLCriterion()({pred, y})
     local module             = nn.gModule({x, y, prev_s},
                                       {err, nn.Identity()(next_s)})
+    -- initialize weights
+    module:getParameters():uniform(-params.init_weight, params.init_weight)
+    return transfer_data(module)
+end
+
+function create_network_for_test()
+    local x                  = nn.Identity()()
+    --local y                  = nn.Identity()()
+    local prev_s             = nn.Identity()()
+    local i                  = {[0] = nn.LookupTable(params.vocab_size,
+                                                    params.rnn_size)(x)}
+    local next_s             = {}
+    local split              = {prev_s:split(params.layers)}
+    for layer_idx = 1, params.layers do
+        --local prev_c         = split[2 * layer_idx - 1]
+        local prev_h         = split[layer_idx]
+        local dropped        = nn.Dropout(params.dropout)(i[layer_idx - 1])
+        --local next_h = lstm(dropped, prev_h)
+        local next_h = gru(dropped, prev_h)
+        --table.insert(next_s, next_c)
+        table.insert(next_s, next_h)
+        i[layer_idx] = next_h
+    end
+    local h2y                = nn.Linear(params.rnn_size, params.vocab_size)
+    local dropped            = nn.Dropout(params.dropout)(i[params.layers])
+    local pred               = nn.LogSoftMax()(h2y(dropped))
+    --local err                = nn.ClassNLLCriterion()({pred, y})
+    local module             = nn.gModule({x, prev_s},
+                                      {pred, nn.Identity()(next_s)})
     -- initialize weights
     module:getParameters():uniform(-params.init_weight, params.init_weight)
     return transfer_data(module)
@@ -325,8 +354,11 @@ while epoch < params.max_max_epoch do
         if epoch > params.max_epoch then
             params.lr = params.lr / params.decay
         end
-	torch.save(string.format('%s.%d',opt.save, step/epoch_size),model.core_network)
+	--torch.save(string.format('%s.%d',opt.save, step/epoch_size),model.core_network)
     end
 end
 run_test()
+test_work = create_network_for_test()
+test_work:getParameters():copy(model.core_network:getParameters())
+torch.save(opt.save, test_work)
 print("Training is over.")
