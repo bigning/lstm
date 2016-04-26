@@ -91,7 +91,8 @@ local function gru(x, prev_h)
 
     local hhat_linear_input = nn.Linear(params.rnn_size, params.rnn_size)(x)
     local hhat_linear_rh = nn.CMulTable()({reset_gate, prev_h})
-    local hhat_linear = nn.CAddTable()({hhat_linear_input, hhat_linear_rh})
+    local hhat_linear_linear_rh = nn.Linear(params.rnn_size, params.rnn_size)(hhat_linear_rh)
+    local hhat_linear = nn.CAddTable()({hhat_linear_input, hhat_linear_linear_rh})
     local hhat = nn.Tanh()(hhat_linear)
 
     local next_h_1 = nn.CMulTable()({update_gate, prev_h})
